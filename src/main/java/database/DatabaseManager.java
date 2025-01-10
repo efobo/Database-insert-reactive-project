@@ -67,9 +67,11 @@ public class DatabaseManager {
             statement.executeUpdate("DROP TABLE IF EXISTS Review CASCADE;");
             statement.executeUpdate("DROP TABLE IF EXISTS Product CASCADE;");
             statement.executeUpdate("DROP TABLE IF EXISTS Manufacturer CASCADE;");
+            statement.executeUpdate("DROP TYPE IF EXISTS Country;");
             log("Tables and index dropped.");
         }
     }
+
 
     public static void createTables(Connection connection) throws Exception {
         log("Creating tables and index...");
@@ -80,12 +82,14 @@ public class DatabaseManager {
                     "    foundation_date DATE NOT NULL\n" +
                     ");");
 
+            statement.executeUpdate("CREATE TYPE Country AS ENUM ('USA', 'UK', 'GERMANY', 'RUSSIA', 'CHINA');");
+
             statement.executeUpdate("CREATE TABLE Product (\n" +
                     "    id SERIAL PRIMARY KEY,\n" +
                     "    price NUMERIC(10, 2) NOT NULL,\n" +
                     "    name VARCHAR(255) NOT NULL,\n" +
                     "    release_date DATE NOT NULL,\n" +
-                    "    country VARCHAR(255) NOT NULL,\n" +
+                    "    country Country NOT NULL,\n" +
                     "    manufacturer_id INT NOT NULL REFERENCES Manufacturer(id)\n" +
                     ");");
 
@@ -101,6 +105,7 @@ public class DatabaseManager {
             log("Tables and index created.");
         }
     }
+
 
     public static void fillTables(Connection connection, int manufacturerCount, int productsCount, int reviewsPerProduct) throws Exception {
         log("Filling tables with generated data...");
@@ -131,7 +136,7 @@ public class DatabaseManager {
                 productStmt.setBigDecimal(1, BigDecimal.valueOf(product.getPrice()));
                 productStmt.setString(2, product.getName());
                 productStmt.setDate(3, java.sql.Date.valueOf(product.getReleaseDate()));
-                productStmt.setString(4, String.valueOf(product.getCountry())); // Поле country теперь VARCHAR(255)
+                productStmt.setObject(4, product.getCountry().toString(), java.sql.Types.OTHER);
                 productStmt.setInt(5, product.getManufacturer().id());
                 productStmt.execute();
             }
@@ -156,6 +161,7 @@ public class DatabaseManager {
 
         log("Tables filled with data.");
     }
+
 
     public static void log(String message) {
         System.out.println("[LOG] " + message);

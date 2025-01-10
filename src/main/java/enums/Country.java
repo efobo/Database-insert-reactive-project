@@ -2,7 +2,8 @@ package enums;
 
 public enum Country {
     USA,
-    CHINA,
+    UK,
+    GERMANY,
     RUSSIA,
-    GERMANY
+    CHINA
 }
