@@ -3,16 +3,14 @@ package database;
 import entities.Manufacturer;
 import entities.Product;
 import entities.Review;
+import enums.Country;
 import generators.ManufacturerGenerator;
 import generators.ProductGenerator;
 
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,7 +65,7 @@ public class DatabaseManager {
             statement.executeUpdate("DROP TABLE IF EXISTS Review CASCADE;");
             statement.executeUpdate("DROP TABLE IF EXISTS Product CASCADE;");
             statement.executeUpdate("DROP TABLE IF EXISTS Manufacturer CASCADE;");
-            statement.executeUpdate("DROP TYPE IF EXISTS Country;");
+            statement.executeUpdate("DROP TABLE IF EXISTS Country;");
             log("Tables and index dropped.");
         }
     }
@@ -76,29 +74,32 @@ public class DatabaseManager {
     public static void createTables(Connection connection) throws Exception {
         log("Creating tables and index...");
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE Manufacturer (\n" +
-                    "    id SERIAL PRIMARY KEY,\n" +
-                    "    name VARCHAR(255) NOT NULL,\n" +
-                    "    foundation_date DATE NOT NULL\n" +
+            statement.executeUpdate("CREATE TABLE Country (" +
+                    "    id SERIAL PRIMARY KEY," +
+                    "    name VARCHAR(50) NOT NULL UNIQUE" +
                     ");");
 
-            statement.executeUpdate("CREATE TYPE Country AS ENUM ('USA', 'UK', 'GERMANY', 'RUSSIA', 'CHINA');");
-
-            statement.executeUpdate("CREATE TABLE Product (\n" +
-                    "    id SERIAL PRIMARY KEY,\n" +
-                    "    price NUMERIC(10, 2) NOT NULL,\n" +
-                    "    name VARCHAR(255) NOT NULL,\n" +
-                    "    release_date DATE NOT NULL,\n" +
-                    "    country Country NOT NULL,\n" +
-                    "    manufacturer_id INT NOT NULL REFERENCES Manufacturer(id)\n" +
+            statement.executeUpdate("CREATE TABLE Manufacturer (" +
+                    "    id SERIAL PRIMARY KEY," +
+                    "    name VARCHAR(255) NOT NULL," +
+                    "    foundation_date DATE NOT NULL" +
                     ");");
 
-            statement.executeUpdate("CREATE TABLE Review (\n" +
-                    "    id SERIAL PRIMARY KEY,\n" +
-                    "    date_time TIMESTAMP WITH TIME ZONE NOT NULL,\n" +
-                    "    user_name VARCHAR(255) NOT NULL,\n" +
-                    "    rating INT CHECK (rating >= 1 AND rating <= 5),\n" +
-                    "    product_id INT NOT NULL REFERENCES Product(id)\n" +
+            statement.executeUpdate("CREATE TABLE Product (" +
+                    "    id SERIAL PRIMARY KEY," +
+                    "    price NUMERIC(10, 2) NOT NULL," +
+                    "    name VARCHAR(255) NOT NULL," +
+                    "    release_date DATE NOT NULL," +
+                    "    country_id INT NOT NULL REFERENCES Country(id)," +
+                    "    manufacturer_id INT NOT NULL REFERENCES Manufacturer(id)" +
+                    ");");
+
+            statement.executeUpdate("CREATE TABLE Review (" +
+                    "    id SERIAL PRIMARY KEY," +
+                    "    date_time TIMESTAMP WITH TIME ZONE NOT NULL," +
+                    "    user_name VARCHAR(255) NOT NULL," +
+                    "    rating INT CHECK (rating >= 1 AND rating <= 5)," +
+                    "    product_id INT NOT NULL REFERENCES Product(id)" +
                     ");");
 
             statement.executeUpdate("CREATE INDEX idx_product_reviews ON Review (product_id);");
@@ -107,14 +108,31 @@ public class DatabaseManager {
     }
 
 
+    public static void fillCountryTable(Connection connection) throws Exception {
+        log("Filling Country table...");
+        try (PreparedStatement countryStmt = connection.prepareStatement(
+                "INSERT INTO Country (name) VALUES (?)")) {
+            for (Country country : Country.values()) {
+                countryStmt.setString(1, country.name());
+                countryStmt.addBatch();
+            }
+            countryStmt.executeBatch();
+        }
+        log("Country table filled.");
+    }
+
+
+
     public static void fillTables(Connection connection, int manufacturerCount, int productsCount, int reviewsPerProduct) throws Exception {
         log("Filling tables with generated data...");
+
+        fillCountryTable(connection);
 
         log("Generating " + manufacturerCount + " rows for Manufacturer table...");
         ManufacturerGenerator manufacturerGenerator = new ManufacturerGenerator();
         List<Manufacturer> manufacturers = manufacturerGenerator.generateList(manufacturerCount);
 
-        log("Filling in the table of Manufactures started...");
+        log("Filling in the Manufacturer table...");
         try (PreparedStatement manufacturerStmt = connection.prepareStatement(
                 "INSERT INTO Manufacturer (name, foundation_date) VALUES (?, ?) RETURNING id")) {
             for (Manufacturer manufacturer : manufacturers) {
@@ -123,27 +141,27 @@ public class DatabaseManager {
                 manufacturerStmt.execute();
             }
         }
-        log("The table of Manufactures is filled in.");
+        log("Manufacturer table filled.");
 
         log("Generating " + productsCount + " rows for Product table...");
         ProductGenerator productGenerator = new ProductGenerator(manufacturers, reviewsPerProduct);
         List<Product> products = productGenerator.generateList(productsCount);
 
-        log("Filling in the table of Product started...");
+        log("Filling in the Product table...");
         try (PreparedStatement productStmt = connection.prepareStatement(
-                "INSERT INTO Product (price, name, release_date, country, manufacturer_id) VALUES (?, ?, ?, ?, ?) RETURNING id")) {
+                "INSERT INTO Product (price, name, release_date, country_id, manufacturer_id) VALUES (?, ?, ?, ?, ?) RETURNING id")) {
             for (Product product : products) {
                 productStmt.setBigDecimal(1, BigDecimal.valueOf(product.getPrice()));
                 productStmt.setString(2, product.getName());
                 productStmt.setDate(3, java.sql.Date.valueOf(product.getReleaseDate()));
-                productStmt.setObject(4, product.getCountry().toString(), java.sql.Types.OTHER);
+                productStmt.setInt(4, getCountryId(connection, product.getCountry())); // Get country_id from Country table
                 productStmt.setInt(5, product.getManufacturer().id());
                 productStmt.execute();
             }
         }
-        log("The table of Product is filled in.");
+        log("Product table filled.");
 
-        log("Filling in the table of Reviews started...");
+        log("Filling in the Review table...");
         try (PreparedStatement reviewStmt = connection.prepareStatement(
                 "INSERT INTO Review (date_time, user_name, rating, product_id) VALUES (?, ?, ?, ?)")) {
             for (Product product : products) {
@@ -157,14 +175,30 @@ public class DatabaseManager {
                 reviewStmt.executeBatch();
             }
         }
-        log("The table of Reviews is filled in.");
+        log("Review table filled.");
 
-        log("Tables filled with data.");
+        log("All tables filled with data.");
     }
+
 
 
     public static void log(String message) {
         System.out.println("[LOG] " + message);
     }
+
+    private static int getCountryId(Connection connection, Country country) throws Exception {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT id FROM Country WHERE name = ?")) {
+            stmt.setString(1, country.name());
+            try (ResultSet resultSet = stmt.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt("id");
+                } else {
+                    throw new IllegalStateException("Country not found: " + country);
+                }
+            }
+        }
+    }
+
 }
 

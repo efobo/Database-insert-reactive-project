@@ -4,26 +4,21 @@ CREATE TABLE Manufacturer (
                               foundation_date DATE NOT NULL
 );
 
-
-CREATE TYPE Country AS ENUM (
-    'USA',
-    'UK',
-    'GERMANY',
-    'RUSSIA',
-    'CHINA'
+CREATE TABLE Country (
+                         id SERIAL PRIMARY KEY,
+                         name VARCHAR(255) NOT NULL UNIQUE
 );
-
 
 CREATE TABLE Product (
                          id SERIAL PRIMARY KEY,
                          price NUMERIC(10, 2) NOT NULL,
                          name VARCHAR(255) NOT NULL,
                          release_date DATE NOT NULL,
-                         country Country NOT NULL,
+                         country_id INT NOT NULL,
                          manufacturer_id INT NOT NULL,
+                         FOREIGN KEY (country_id) REFERENCES Country(id),
                          FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(id)
 );
-
 
 CREATE TABLE Review (
                         id SERIAL PRIMARY KEY,
@@ -35,3 +30,4 @@ CREATE TABLE Review (
 );
 
 CREATE INDEX idx_product_reviews ON Review (product_id);
+
