@@ -89,6 +89,7 @@ public class DatabaseManager {
                     "    id SERIAL PRIMARY KEY," +
                     "    price NUMERIC(10, 2) NOT NULL," +
                     "    rating NUMERIC(10, 3) DEFAULT 0," +
+                    "    review_num INT DEFAULT 0," +
                     "    name VARCHAR(255) NOT NULL," +
                     "    release_date DATE NOT NULL," +
                     "    country_id INT NOT NULL REFERENCES Country(id)," +
@@ -159,13 +160,14 @@ public class DatabaseManager {
 
         log("Filling in the Product table...");
         try (PreparedStatement productStmt = connection.prepareStatement(
-                "INSERT INTO Product (price, name, release_date, country_id, manufacturer_id) VALUES (?, ?, ?, ?, ?) RETURNING id")) {
+                "INSERT INTO Product (price, review_num, name, release_date, country_id, manufacturer_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")) {
             for (Product product : products) {
                 productStmt.setBigDecimal(1, BigDecimal.valueOf(product.getPrice()));
-                productStmt.setString(2, product.getName());
-                productStmt.setDate(3, java.sql.Date.valueOf(product.getReleaseDate()));
-                productStmt.setInt(4, getCountryId(connection, product.getCountry())); // Get country_id from Country table
-                productStmt.setInt(5, product.getManufacturer().id());
+                productStmt.setInt(2, reviewsPerProduct);
+                productStmt.setString(3, product.getName());
+                productStmt.setDate(4, java.sql.Date.valueOf(product.getReleaseDate()));
+                productStmt.setInt(5, getCountryId(connection, product.getCountry())); // Get country_id from Country table
+                productStmt.setInt(6, product.getManufacturer().id());
                 productStmt.execute();
             }
         }

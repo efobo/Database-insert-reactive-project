@@ -17,7 +17,7 @@ public class Main {
                 dbmanager.createTables(connection);
 
                 int manufacturerCount = 10;
-                int productsCount = 5000;
+                int productsCount = 10000;
                 int reviewsPerProduct = 5;
 
                 dbmanager.fillTables(connection, manufacturerCount, productsCount, reviewsPerProduct);
