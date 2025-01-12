@@ -88,6 +88,7 @@ public class DatabaseManager {
             statement.executeUpdate("CREATE TABLE Product (" +
                     "    id SERIAL PRIMARY KEY," +
                     "    price NUMERIC(10, 2) NOT NULL," +
+                    "    rating NUMERIC(10, 3) DEFAULT 0," +
                     "    name VARCHAR(255) NOT NULL," +
                     "    release_date DATE NOT NULL," +
                     "    country_id INT NOT NULL REFERENCES Country(id)," +
@@ -119,6 +120,15 @@ public class DatabaseManager {
             countryStmt.executeBatch();
         }
         log("Country table filled.");
+    }
+
+    private static void updateProductRating(Connection connection, int productId, double rating) throws SQLException {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "UPDATE Product SET rating = ? WHERE id = ?")) {
+            stmt.setDouble(1, rating);
+            stmt.setInt(2, productId);
+            stmt.executeUpdate();
+        }
     }
 
 
@@ -165,14 +175,18 @@ public class DatabaseManager {
         try (PreparedStatement reviewStmt = connection.prepareStatement(
                 "INSERT INTO Review (date_time, user_name, rating, product_id) VALUES (?, ?, ?, ?)")) {
             for (Product product : products) {
+                double ratingSum = 0;
                 for (Review review : product.getReviews()) {
                     reviewStmt.setTimestamp(1, java.sql.Timestamp.from(review.getDateTime().toInstant()));
                     reviewStmt.setString(2, review.getUser());
                     reviewStmt.setInt(3, review.getRating());
                     reviewStmt.setInt(4, product.getId());
                     reviewStmt.addBatch();
+                    ratingSum += review.getRating();
                 }
                 reviewStmt.executeBatch();
+                double averageRating = (reviewsPerProduct > 0) ? ratingSum / reviewsPerProduct : 0;
+                updateProductRating(connection, product.getId(), averageRating);
             }
         }
         log("Review table filled.");

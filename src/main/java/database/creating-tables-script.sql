@@ -12,6 +12,7 @@ CREATE TABLE Country (
 CREATE TABLE Product (
                          id SERIAL PRIMARY KEY,
                          price NUMERIC(10, 2) NOT NULL,
+                         rating NUMERIC(2,3) DEFAULT 0,
                          name VARCHAR(255) NOT NULL,
                          release_date DATE NOT NULL,
                          country_id INT NOT NULL,
