@@ -88,8 +88,8 @@ public class DatabaseManager {
             statement.executeUpdate("CREATE TABLE Product (" +
                     "    id SERIAL PRIMARY KEY," +
                     "    price NUMERIC(10, 2) NOT NULL," +
-                    "    rating NUMERIC(10, 3) DEFAULT 0," +
-                    "    review_num INT DEFAULT 0," +
+                    "    awg_rating NUMERIC(10, 3) DEFAULT 0," +
+                    "    review_count INT DEFAULT 0," +
                     "    name VARCHAR(255) NOT NULL," +
                     "    release_date DATE NOT NULL," +
                     "    country_id INT NOT NULL REFERENCES Country(id)," +
@@ -125,7 +125,7 @@ public class DatabaseManager {
 
     private static void updateProductRating(Connection connection, int productId, double rating) throws SQLException {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "UPDATE Product SET rating = ? WHERE id = ?")) {
+                "UPDATE Product SET awg_rating = ? WHERE id = ?")) {
             stmt.setDouble(1, rating);
             stmt.setInt(2, productId);
             stmt.executeUpdate();
@@ -160,7 +160,7 @@ public class DatabaseManager {
 
         log("Filling in the Product table...");
         try (PreparedStatement productStmt = connection.prepareStatement(
-                "INSERT INTO Product (price, review_num, name, release_date, country_id, manufacturer_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")) {
+                "INSERT INTO Product (price, review_count, name, release_date, country_id, manufacturer_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")) {
             for (Product product : products) {
                 productStmt.setBigDecimal(1, BigDecimal.valueOf(product.getPrice()));
                 productStmt.setInt(2, reviewsPerProduct);
